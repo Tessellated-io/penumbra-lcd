@@ -2,7 +2,8 @@
 extern crate rocket;
 
 use penumbra_proto::util::tendermint_proxy::v1::SyncInfo;
-use rocket::serde::json::{json, Value};
+use rocket::response::status;
+use rocket::serde::json::{Json, json, Value};
 use rocket::State;
 use clap::Parser;
 use futures::TryStreamExt;
@@ -423,8 +424,8 @@ async fn proposals(args: &State<Args>) -> Value {
 }
 
 #[get("/cosmos/gov/v1beta1/proposals/<proposal_id>/votes/<voter>")]
-async fn proposal_vote(proposal_id: u64, voter: &str, args: &State<Args>) -> Value {
-    let channel = Channel::from_shared(args.node.to_string())
+fn get_vote(voter: &str, proposal_id: i32) -> status::Custom<Json<Value>> {
+  let channel = Channel::from_shared(args.node.to_string())
         .unwrap()
         .tls_config(ClientTlsConfig::new())
         .unwrap()
@@ -449,19 +450,19 @@ async fn proposal_vote(proposal_id: u64, voter: &str, args: &State<Args>) -> Val
             identity.to_string() == voter
         });
 
-    match validator_vote {
-        None => json!({
+      let response = match validator_vote {
+        None => status::Custom(rocket::http::Status::NotFound, Json(json!({
             "code": 3,
             "message": format!("voter: {} not found for proposal: {}", voter, proposal_id),
             "details": []
-        }),
+        }))),
         Some(vote) => {
             match &vote.vote {
-                None => json!({
+                None =>  status::Custom(rocket::http::Status::NotFound, Json(json!({
                     "code": 3,
                     "message": format!("voter: {} not found for proposal: {}", voter, proposal_id),
                     "details": []
-                }),
+                }))),
                 Some(option) => {
                     let vote = match option.vote {
                         3 => "VOTE_OPTION_NO",
@@ -470,7 +471,7 @@ async fn proposal_vote(proposal_id: u64, voter: &str, args: &State<Args>) -> Val
                         _ => "VOTE_OPTION_UNSPECIFIED"
                     };
 
-                    json!({
+                    status::Custom(rocket::http::Status::Ok, Json(json!({
                         "vote": {
                           "proposal_id": proposal_id.to_string(),
                           "voter": voter,
@@ -482,11 +483,14 @@ async fn proposal_vote(proposal_id: u64, voter: &str, args: &State<Args>) -> Val
                             }
                           ]
                         }
-                      })
+                      })))
                 }
             }
         }
-    }
+    };
+    
+  
+      response
 }
 
 #[launch]
