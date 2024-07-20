@@ -496,7 +496,7 @@ async fn get_vote(voter: &str, proposal_id: u64, args: &State<Args>) -> status::
   response
 }
 
-#[get("/vote/<proposal_id>/<voter>")]
+#[get("/cosmos/gov/v1beta1/vote/<proposal_id>/<voter>")]
 async fn proposal_vote(proposal_id: u64, voter: &str, args: &State<Args>) -> status::Custom<Json<Value>> {
     get_vote(voter, proposal_id, args).await
 }
